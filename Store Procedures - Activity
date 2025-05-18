@@ -149,9 +149,57 @@ call calculate_total_stock_value_of_product(2);
 
 -- ACTIVITY 9 --
 
+CREATE OR REPLACE PROCEDURE check_stock_level(p_id INT)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    p_stock INT;
+BEGIN
+    SELECT stock_quantity
+    INTO p_stock
+    FROM products
+    WHERE product_id = p_id;
 
+    IF NOT FOUND THEN
+        RAISE NOTICE 'No product found with ID %', p_id;
+    ELSIF p_stock <= 10 THEN
+        RAISE NOTICE 'Low stock (Quantity: %)', p_stock;
+    ELSIF p_stock <= 55 THEN
+        RAISE NOTICE 'Sufficient stock (Quantity: %)', p_stock;
+    ELSE
+        RAISE NOTICE 'High stock (Quantity: %)', p_stock;
+    END IF;
+END;
+$$;
 
+ call check_stock_level(4);
 
+-- ACTIVITY 10 --
 
+CREATE OR REPLACE PROCEDURE check_stock_category(p_id INT)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    p_stock INT;
+    stock_category TEXT;
+BEGIN
+    SELECT stock_quantity
+    INTO p_stock
+    FROM products
+    WHERE product_id = p_id;
 
+    IF NOT FOUND THEN
+        RAISE NOTICE 'No product found with ID %', p_id;
+    ELSE
+        stock_category := CASE 
+            WHEN p_stock < 10 THEN 'Low Stock'
+            WHEN p_stock BETWEEN 10 AND 50 THEN 'Moderate Stock'
+            ELSE 'High Stock'
+        END;
 
+        RAISE NOTICE 'Stock category for product ID %: % (Quantity: %)', p_id, stock_category, p_stock;
+    END IF;
+END;
+$$;
+
+ call check_stock_category(4);
