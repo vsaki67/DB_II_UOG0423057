@@ -1,1 +1,157 @@
 -- ACTIVITY 1 --
+
+CREATE PROCEDURE add_numbers (num1 INT, num2 INT)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+      sum INT;
+BEGIN
+      sum := num1 + num2;
+      RAISE NOTICE 'Sum of % % is %',num1, num2, sum;
+END;
+$$;
+
+CALL add_numbers(3,5);
+
+-- ACTIVITY 2 --
+
+CREATE PROCEDURE full_name (f_name VARCHAR(50),l_name VARCHAR(50))
+LANGUAGE plpgsql
+AS $$
+DECLARE
+      fullName VARCHAR(100);
+BEGIN
+      fullName := f_name || ' ' || l_name;
+      RAISE NOTICE 'My name is %', fullName;
+END;
+$$;
+
+CALL full_name('Vorandi', 'Sakithma');
+
+-- ACTIVITY 3 --
+
+CREATE PROCEDURE double_value (INOUT salary INT)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+      salary := salary * 2;
+END;
+$$;
+
+DO
+$$
+DECLARE
+      salary INT := 25000;
+BEGIN
+      CALL double_value (salary);
+      RAISE NOTICE '%', salary;
+END;
+$$
+LANGUAGE plpgsql;
+
+-- ACTIVITY 4 -- 
+
+CREATE DATABASE ABXCompany;
+
+\c abxcompany;
+
+CREATE TABLE products(
+    product_id INT GENERATED ALWAYS AS IDENTITY,
+    name VARCHAR(50),
+    price INT,
+    stock_quantity INT
+);
+
+CREATE PROCEDURE add_product (p_name VARCHAR(50), p_price INT, stock_qty INT)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+   INSERT INTO products(name,price,stock_quantity)VALUES(p_name,p_price,stock_qty);
+END;
+$$;
+
+CALL add_product ('Chocolate cake',4500, 5);
+
+-- ACTIVITY 5 --
+
+CREATE OR REPLACE PROCEDURE get_product_by_id (p_id INT)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    p_name TEXT;
+    p_price NUMERIC;
+    p_stock INT;
+BEGIN
+    SELECT name, price, stock_quantity
+    INTO p_name, p_price, p_stock
+    FROM products
+    WHERE product_id = p_id;
+
+    RAISE NOTICE 'Product Name: %, Price: %, Stock: %', p_name, p_price, p_stock;
+END;
+$$;
+
+ CALL  get_product_by_id(1);
+
+-- ACTIIVTY 6 --
+
+CREATE PROCEDURE update_product_stock (p_id INT, new_stock INT)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    UPDATE products SET stock_quantity = new_stock WHERE product_id = p_id;
+    RAISE NOTICE 'Stock updated for product ID % to new stock %', p_id, new_stock;
+END;
+$$;
+
+CALL update_product_stock(1,10);
+
+-- ACTIVITY 7 --
+
+CREATE OR REPLACE PROCEDURE delete_product(p_id INT)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    DELETE FROM products
+    WHERE product_id = p_id;
+
+    RAISE NOTICE 'Product with ID % has been deleted.', p_id;
+END;
+$$;
+
+CALL delete_product(3);
+
+-- ACTIVITY 8 --
+
+CREATE OR REPLACE PROCEDURE calculate_total_stock_value_of_product(p_id INT)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    p_price NUMERIC;
+    p_stock INT;
+    total_value NUMERIC;
+BEGIN
+    SELECT price, stock_quantity
+    INTO p_price, p_stock
+    FROM products
+    WHERE product_id = p_id;
+
+    IF NOT FOUND THEN
+        RAISE NOTICE 'No product found with ID %', p_id;
+    ELSE
+        total_value := p_price * p_stock;
+        RAISE NOTICE 'Total stock value of product ID % is %', p_id, total_value;
+    END IF;
+END;
+$$;
+
+call calculate_total_stock_value_of_product(2);
+
+-- ACTIVITY 9 --
+
+
+
+
+
+
+
