@@ -1,0 +1,370 @@
+-- TRIGGERS --
+
+CREATE DATABASE trigger_db;
+\c trigger_db;
+
+CREATE TABLE product(
+	productId INT GENERATED ALWAYS AS IDENTITY,
+	pName VARCHAR(10),
+	price DECIMAL
+);
+
+CREATE TABLE product_log(
+	log_id INT,
+	action VARCHAR(10),
+	action_time  TIME
+);
+
+CREATE TABLE unavailable_products(
+	log_id INT,
+	productId INT,
+	productName VARCHAR(10),
+	price DECIMAL,
+	action VARCHAR(10),
+	action_time TIME
+);
+
+  -- ACTIVITY 1 --
+  
+  // TRIGGER FUNCTION //
+
+CREATE OR REPLACE FUNCTION validate_price_function()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN 	
+	RAISE NOTICE 'PRICE MUST BE GREATER THAN 0.0.';
+	RETURN NULL;
+END;
+$$;
+
+ // TRIGGER //
+
+CREATE TRIGGER validate_product_price
+BEFORE INSERT OR UPDATE
+ON product
+FOR EACH ROW
+WHEN (NEW.price <= 0.0)
+EXECUTE FUNCTION validate_price_function();
+
+
+INSERT INTO product (pName, price) VALUES ('CHOCOLATE', 0.0);
+INSERT INTO product (pName, price) VALUES ('CHOCOLATE', 10.0);
+
+ -- ACTIVITY 2 --
+
+CREATE TABLE employee(
+	emp_id INT GENERATED ALWAYS AS IDENTITY,
+	emp_Name VARCHAR(50),
+	salary DECIMAL
+);
+
+  // TRIGGER FUNCTION
+
+CREATE OR REPLACE FUNCTION update_salary_function()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN 
+	NEW.salary := NEW.salary + 7500;
+	RETURN NEW;
+END;
+$$;
+
+ // TRIGGER
+
+CREATE TRIGGER update_salary_
+BEFORE INSERT OR UPDATE
+ON employee
+FOR EACH ROW
+WHEN (NEW.salary > 200000.0)
+EXECUTE FUNCTION update_salary_function();
+
+INSERT INTO employee (emp_Name,salary) VALUES ('NAYAN', 200000.00);
+
+INSERT INTO employee (emp_Name,salary) VALUES ('KAMAL', 180000.00);
+UPDATE employee SET salary = salary + 30000 WHERE emp_Name = 'KAMAL'; //here salary updated to 217500.00
+
+-- ACTIVITY 3 --
+
+ // FUNCTION
+
+CREATE OR REPLACE FUNCTION product_log_func()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+	INSERT INTO product_log(action, action_time )
+	VALUES('INSERT', CURRENT_TIMESTAMP);
+	RETURN NEW;
+END;
+$$;
+
+ // TRIGGER
+
+CREATE TRIGGER product_log_trig
+AFTER INSERT
+ON product_log
+FOR EACH ROW
+WHEN (NEW.pName)
+EXECUTE FUNCTION product_log_func();
+
+-- ACTIVITY 4 --
+
+ //FUNCTION
+CREATE OR REPLACE FUNCTION log_employee_insert_function()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+	 INSERT INTO employee_log (emp_id, action, action_time)
+	 VALUES(NEW.emp_id, 'INSERT', CURRENT_TIMESTAMP);
+	 RETURN NEW;
+END;
+$$;
+ 
+ // TRIGGER
+CREATE TRIGGER log_employee_insert
+AFTER INSERT ON employee
+FOR EACH ROW
+EXECUTE FUNCTION log_employee_insert_function();
+
+-- ACTIIVTY 5 --
+
+ //FUNCTION
+CREATE OR REPLACE FUNCTION prevent_price_decrease()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+	RAISE NOTICE 'Price decrease is not allowed. Old price: %, New price: %',OLD.price, NEW.price;
+	RETURN NULL;
+END;
+$$;
+
+ // TRIGGER
+ 
+CREATE TRIGGER prevent_price_decrement
+BEFORE UPDATE
+ON product
+FOR EACH ROW
+WHEN (NEW.price <= OLD.price)
+EXECUTE FUNCTION prevent_price_decrease();
+
+-- ACTIIVTY 6 -- 
+
+ // FUNCTION
+CREATE OR REPLACE FUNCTION log_deleted_product()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+	INSERT INTO unavailable_products(productId, productName, price, action_time)
+	VALUES (OLD.productId, OLD.productName, OLD.price, CURRENT_TIMESTAMP);
+	RETURN OLD;
+END;
+$$;
+
+ // TRIGGER
+ 
+CREATE TRIGGER product_deletion_log
+AFTER DELETE
+ON product
+FOR EACH ROW
+EXECUTE FUNCTION log_deleted_product();
+
+
+-- ACTIIVTY 7 -- 
+
+CREATE OR REPLACE FUNCTION truncated_total()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+	total_sale DECIMAL(10,2);
+BEGIN
+	SELECT SUM(amount) INTO total_sale
+	FROM sales_order;
+	
+	INSERT INTO monthly_Sales(date, total_amount) VALUES (CURRENT_DATE, total_sales);
+	RETURN NULL;
+END; $$;
+
+ // TRIGGER
+CREATE TRIGGER before_Truncate
+BEFORE TRUNCATE
+ON sales_order
+FOR EACH STATEMENT
+EXECUTE FUNCTION truncated_total();
+
+-- ACTIIVTY 8 --
+
+CREATE OR REPLACE FUNCTION log_truncate_action()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN 
+	INSERT INTO auditLog (action, action_time)
+	VALUES ('TRUNCATE',CURRENT_TIMESTAMP);
+	RETURN NULL;
+END;
+$$;
+
+CREATE TRIGGER trigger_after_truncate
+AFTER TRUNCATE
+ON employee
+FOR EACH STATEMENT
+EXECUTE FUNCTION log_truncate_action();
+
+-- ACTIIVTY 9 -- SOFT DELETION
+
+CREATE TABLE student_tbl(
+   id INT GENERATED ALWAYS AS IDENTITY,
+   name VARCHAR(50),
+   is_active VARCHAR(50)
+);
+
+ // VEIW 
+
+CREATE VIEW student_details AS
+SELECT id, name, is_active
+FROM student_tbl
+WHERE is_active = 'T'; // SHOWS only active students in student_details
+
+ // FUNCTION
+
+CREATE OR REPLACE FUNCTION instead_of_delete_student_details()
+RETURNS TRIGGER 
+LANGUAGE plpgsql
+AS $$
+BEGIN 
+	UPDATE student_tbl
+	SET is_active = 'F'
+	WHERE id = OLD.id;
+	RETURN NULL;
+END;
+$$;
+ 
+ // TRIGGER
+
+CREATE TRIGGER trg_instead_delete_student_details
+INSTEAD OF DELETE ON student_details
+FOR EACH ROW
+EXECUTE FUNCTION instead_of_delete_student_details();
+
+// deleting only from student_details table not from student_tbl (SOFT DELETION)
+DELETE FROM student_details WHERE name = 'vorandi'; 
+
+SELECT * FROM student_details;
+
+
+-- ACTIIVTY --
+
+CREATE TABLE employee(
+	emp_id INT GENERATED ALWAYS AS IDENTITY,
+	name VARCHAR(20),
+	position VARCHAR(20),
+	salary INT
+);
+
+CREATE TABLE auditLog(
+	log_id INT GENERATED ALWAYS AS IDENTITY,
+	emp_id INT
+	action VARCHAR,
+	action_time DATE
+);
+
+-- ACTIIVTY 10 --
+
+ // VIEW
+ 
+CREATE VIEW vw_Employees
+AS
+SELECT emp_id, name, position, salary
+FROM Employees;
+ 
+ // FUNCTION
+ 
+CREATE FUNCTION validate_salary()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEFORE
+	INSERT INTO auditLog(emp_id, action, action_time)
+	VALUES ('INSERT','INSERT', CURRENT_TIMESTAMP);
+	RETURN NULL;
+END;
+$$;
+
+	//TRIGGER
+	
+CREATE TRIGGER
+INSTEAD OF INSERT ON employee
+FOR EACH ROW
+WHEN (NEW.salary < 2000)
+EXECUTE FUNCTION validate_salary;
+
+-- ACTIIVTY 11 --
+
+CREATE OR REPLACE FUNCTION log_salary_update_attempt()
+RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.salary IS DISTINCT FROM OLD.salary THEN
+        INSERT INTO AuditLog (employee_id, employee_name,action,
+            old_salary,new_salary,action_time)
+        VALUES (
+            OLD.id,
+            OLD.name,
+            'UPDATE_SALARY_ATTEMPT',
+            OLD.salary,
+            NEW.salary,
+            CURRENT_TIMESTAMP
+        );
+    END IF;
+    RETURN NULL;
+END;
+$$;
+
+CREATE TRIGGER trg_log_salary_update
+INSTEAD OF UPDATE ON EmployeeView
+FOR EACH ROW
+WHEN (OLD.salary IS DISTINCT FROM NEW.salary)
+EXECUTE FUNCTION log_salary_update_attempt();
+
+-- ACTIIVTY 12 --
+
+ // FUNCTION
+ 
+CREATE OR REPLACE FUNCTION log_delete_attempt()
+RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO auditLog (emp_id, action, action_time)
+    VALUES (OLD.id, 'DELETE_ATTEMPT', CURRENT_TIMESTAMP);
+    RETURN NULL;
+END;
+$$;
+
+ //TRIGGER
+
+CREATE TRIGGER trg_log_delete_attempt
+INSTEAD OF DELETE ON EmployeeView
+FOR EACH ROW
+EXECUTE FUNCTION log_delete_attempt();
+
+
+-- ACTIIVTY 13 -- // PASSING ARGUMENTS
+
+CREATE TRIGGER
+AFTER UPDATE ON employee
+FOR EACH ROW
+WHEN (OLD. salary < 100000)
+EXECUTE FUNCTION after_update_salary(5000);
+
+CREATE TRIGGER
+AFTER UPDATE ON employee
+FOR EACH ROW
+WHEN (OLD.salary  >= 100000)
+EXECUTE FUNCTION after_update_salary(5700);
+
